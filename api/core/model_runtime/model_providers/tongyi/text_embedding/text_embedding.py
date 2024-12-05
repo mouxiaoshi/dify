@@ -143,9 +143,9 @@ class TongyiTextEmbeddingModel(_CommonTongyi, TextEmbeddingModel):
                 if response.status_code == HTTPStatus.OK:
                     break
                 else:
+                    retries += 1
                     logging.warning(f"Failed to get a valid response after {retries} retries.")
                     time.sleep(retry_delay)
-                    retries += 1
 
             if response.output and "embeddings" in response.output and response.output["embeddings"]:
                 data = response.output["embeddings"][0]
