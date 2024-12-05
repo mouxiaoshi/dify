@@ -1,4 +1,6 @@
+import logging
 import time
+from http import HTTPStatus
 from typing import Optional
 
 import dashscope
@@ -114,6 +116,8 @@ class TongyiTextEmbeddingModel(_CommonTongyi, TextEmbeddingModel):
     def embed_documents(credentials_kwargs: dict, model: str, texts: list[str]) -> tuple[list[list[float]], int]:
         """Call out to Tongyi's embedding endpoint.
 
+        Add retry
+
         Args:
             credentials_kwargs: The credentials to use for the call.
             model: The model to use for embedding.
@@ -124,13 +128,25 @@ class TongyiTextEmbeddingModel(_CommonTongyi, TextEmbeddingModel):
         """
         embeddings = []
         embedding_used_tokens = 0
+        max_retries = 3
+        retry_delay = 0.3
+        response = None
         for text in texts:
-            response = dashscope.TextEmbedding.call(
-                api_key=credentials_kwargs["dashscope_api_key"],
-                model=model,
-                input=text,
-                text_type="document",
-            )
+            retries = 0
+            while retries < max_retries:
+                response = dashscope.TextEmbedding.call(
+                    api_key=credentials_kwargs["dashscope_api_key"],
+                    model=model,
+                    input=text,
+                    text_type="document",
+                )
+                if response.status_code == HTTPStatus.OK:
+                    break
+                else:
+                    logging.warning(f"Failed to get a valid response after {max_retries} retries.")
+                    time.sleep(retry_delay)
+                    retries += 1
+
             if response.output and "embeddings" in response.output and response.output["embeddings"]:
                 data = response.output["embeddings"][0]
                 if "embedding" in data:
